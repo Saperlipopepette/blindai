@@ -54,6 +54,8 @@ use std::untrusted::fs;
 #[cfg(not(target_env = "sgx"))]
 use std::fs;
 
+use std::sync::Arc;
+
 use crate::client_communication::{secured_exchange::exchange_server::ExchangeServer, Exchanger};
 
 use crate::dcap_quote_provider::DcapQuoteProvider;
@@ -68,6 +70,8 @@ mod dcap_quote_provider;
 mod identity;
 mod telemetry;
 mod untrusted;
+mod rest;
+mod rest_untrusted;
 
 #[no_mangle]
 pub extern "C" fn start_server(
@@ -109,14 +113,14 @@ async fn main(
     file.read_to_string(&mut contents)?;
     let network_config: common::NetworkConfig = toml::from_str(&contents)?;
 
-    let dcap_quote_provider = DcapQuoteProvider::new(&enclave_identity.cert_der);
-    let dcap_quote_provider: &'static DcapQuoteProvider = Box::leak(Box::new(dcap_quote_provider));
+    let dcap_quote_provider = Arc::new(DcapQuoteProvider::new(&enclave_identity.cert_der));
 
     // Identity for untrusted (non-attested) communication
     let untrusted_cert = fs::read("tls/host_server.pem")?;
     let untrusted_key = fs::read("tls/host_server.key")?;
     let untrusted_identity = Identity::from_pem(&untrusted_cert, &untrusted_key);
 
+    let grpc_dcap_quote_provider = dcap_quote_provider.clone();
     tokio::spawn({
         let network_config = network_config.clone();
         async move {
@@ -127,7 +131,7 @@ async fn main(
             Server::builder()
                 .tls_config(ServerTlsConfig::new().identity(untrusted_identity))?
                 .add_service(untrusted::AttestationServer::new(MyAttestation {
-                    quote_provider: &dcap_quote_provider,
+                    quote_provider: grpc_dcap_quote_provider,
                 }))
                 .serve(network_config.client_to_enclave_untrusted_socket()?)
                 .await?;
@@ -137,11 +141,13 @@ async fn main(
 
     let exchanger = Exchanger::new(network_config.max_model_size, network_config.max_input_size);
 
-    let server_future = Server::builder()
+    let rgpc_server_future = Server::builder()
         .tls_config(ServerTlsConfig::new().identity((&enclave_identity).into()))?
         .max_frame_size(Some(65536))
-        .add_service(ExchangeServer::new(exchanger))
+        .add_service(ExchangeServer::new(exchanger.clone()))
         .serve(network_config.client_to_enclave_attested_socket()?);
+    let grpc_task =
+        tokio::spawn(async { rgpc_server_future.await.expect("running the rest service") });
 
     info!(
         "Starting server for User --> Enclave (attested TLS) trusted communication at {}",
@@ -153,6 +159,20 @@ async fn main(
         info!("Server running in simulation mode, attestation not available.");
     }
 
+    // REST api
+    let rest_dcap_quote_provider = dcap_quote_provider.clone();
+    let _rest_untrusted_task = tokio::spawn(async move {
+        rest_untrusted::setup(rest_dcap_quote_provider, (&untrusted_cert, &untrusted_key))
+            .await
+            .expect("running the rest untrusted service")
+    });
+    let (enclave_cert_pem, enclave_key_pem) = enclave_identity.as_pem();
+    let _rest_task = tokio::spawn(async move {
+        rest::setup(&exchanger, (&enclave_cert_pem, &enclave_key_pem))
+            .await
+            .expect("running the rest service")
+    });
+
     if !std::env::var("BLINDAI_DISABLE_TELEMETRY").is_ok() {
         telemetry::setup(telemetry_platform, telemetry_uid)?;
     } else {
@@ -160,7 +180,7 @@ async fn main(
     }
     telemetry::add_event(TelemetryEventProps::Started {});
 
-    server_future.await?;
+    let _ = grpc_task.await;
 
     Ok(())
 }

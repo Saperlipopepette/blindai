@@ -56,7 +56,15 @@ impl From<&TlsIdentity> for Identity {
 pub(crate) struct TlsIdentity {
     // TLS certificate and private key
     pub cert_der: Vec<u8>,    // DER encoded X509 certificate
-    private_key_der: Vec<u8>, // DER encoded private key
+    pub private_key_der: Vec<u8>, // DER encoded private key
+}
+
+impl TlsIdentity {
+    pub fn as_pem(&self) -> (String, String) {
+        let cert_pem = pkix::pem::der_to_pem(&self.cert_der, PEM_CERTIFICATE);
+        let private_key_pem = pkix::pem::der_to_pem(&self.private_key_der, PEM_PRIVATE_KEY);
+        (cert_pem, private_key_pem)
+    }
 }
 
 #[derive(Serialize, Deserialize)]

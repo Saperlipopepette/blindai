@@ -43,3 +43,7 @@ oid-registry = { git = "https://github.com/mithril-security/oid-registry-sgx.git
 rsa = {git = "https://github.com/mithril-security/rsa-sgx.git", branch = "target-sgx"}
 pkcs1 = { git = "https://github.com/mithril-security/formats-sgx.git", tag = "pkcs1/v0.2.4-sgx" }
 pkcs8 = { git = "https://github.com/mithril-security/formats-sgx.git", tag = "pkcs8/v0.7.6-sgx" }
+tract-onnx = { git = "https://github.com/mithril-security/tract-sgx-xargo.git", tag = "0.15.9-pre-range-no-fs" }
+tract-core = { git = "https://github.com/mithril-security/tract-sgx-xargo.git", tag = "0.15.9-pre-range-no-fs" }
+warp = { git = "https://github.com/mithril-security/warp.git", tag = "v0.3.2-sgx" }
+tonic-rpc = { git = "https://github.com/mithril-security/tonic-rpc.git", branch = "main" }

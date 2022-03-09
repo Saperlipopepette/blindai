@@ -111,7 +111,7 @@ fn create_tensor<'a, A: serde::de::DeserializeOwned + tract_core::prelude::Datum
     Ok(tensor)
 }
 
-fn run_inference(
+pub fn run_inference(
     model: &OnnxModel,
     input: Vec<u8>,
     input_fact: &Vec<usize>,
@@ -126,7 +126,7 @@ fn run_inference(
         .to_vec())
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Exchanger {
     pub model: std::sync::Arc<Mutex<Option<OnnxModel>>>,
     pub input_fact: std::sync::Arc<Mutex<Vec<usize>>>,

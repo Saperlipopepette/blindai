@@ -17,6 +17,7 @@ use common::untrusted_local_app_client::UntrustedLocalAppClient;
 use tonic::{Request, Response, Status};
 pub use untrusted::attestation_server::*;
 use untrusted::*;
+use std::sync::Arc;
 
 pub mod untrusted {
     tonic::include_proto!("untrusted");
@@ -25,7 +26,7 @@ pub mod untrusted {
 // #[derive(Default)]
 pub struct MyAttestation {
     // pub untrusted: UntrustedLocalAppClient<Channel>,
-    pub(crate) quote_provider: &'static DcapQuoteProvider,
+    pub(crate) quote_provider: Arc<DcapQuoteProvider>,
 }
 
 #[tonic::async_trait]
