@@ -83,8 +83,6 @@ class BuildPy(build_py):
         proto_path = os.path.join(dir_path, "proto")
         import grpc_tools.protoc
 
-        print(dir_path, proto_files, proto_path)
-
         for file in proto_files:
             grpc_tools.protoc.main(
                 [
